@@ -41,44 +41,78 @@
             </div>
 
             <!-- KARTU JADWAL SHOLAT (FLOATING DI ATAS BACKGROUND MASJID) -->
-            <div id="jadwal"
-                class="bg-white/95 backdrop-blur-md rounded-3xl p-6 md:p-8 shadow-2xl shadow-black/40 border border-white/20 text-slate-800">
-                <div
-                    class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-200/60">
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-900">Jadwal Sholat Hari Ini</h2>
-                        <p class="text-sm text-slate-500">
-                            Wilayah Kota Pekanbaru & Sekitarnya ({{ \Carbon\Carbon::now()->translatedFormat('l, d F Y') }})
-                        </p>
-                    </div>
-                    <span
-                        class="inline-flex items-center gap-2 text-xs font-semibold bg-emerald-50 text-emerald-700 px-3.5 py-1.5 rounded-full border border-emerald-100">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Waktu Lokal WIB
-                    </span>
-                </div>
+            <!-- KARTU JADWAL SHOLAT INTERAKTIF (FLOATING DI ATAS BACKGROUND MASJID) -->
+            @if (isset($prayerData) && $prayerData)
+                <div id="jadwal"
+                    class="bg-white/95 backdrop-blur-md rounded-3xl p-6 md:p-8 shadow-2xl shadow-black/40 border border-white/20 text-slate-800">
 
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    @php
-                        $prayers = [
-                            'Subuh' => $prayerSchedule['subuh'] ?? '--:--',
-                            'Dzuhur' => $prayerSchedule['dzuhur'] ?? '--:--',
-                            'Ashar' => $prayerSchedule['ashar'] ?? '--:--',
-                            'Maghrib' => $prayerSchedule['maghrib'] ?? '--:--',
-                            'Isya' => $prayerSchedule['isya'] ?? '--:--',
-                        ];
-                    @endphp
-
-                    @foreach ($prayers as $name => $time)
-                        <div
-                            class="bg-slate-100/80 hover:bg-emerald-50/80 rounded-2xl p-4 text-center border border-slate-200/50 transition group">
-                            <span
-                                class="text-xs font-medium text-slate-500 group-hover:text-emerald-700 block mb-1">{{ $name }}</span>
-                            <span
-                                class="text-lg md:text-xl font-bold text-slate-900 group-hover:text-emerald-800">{{ $time }}</span>
+                    <!-- HEADER BAR: WAKTU LOKAL + BADGE IMSAK/IFTAR -->
+                    <div
+                        class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-200/60">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                <span>Jadwal Sholat Hari Ini</span>
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            </h2>
+                            <p class="text-sm text-slate-500">
+                                Pekanbaru & Sekitarnya ({{ \Carbon\Carbon::now()->translatedFormat('l, d F Y') }})
+                            </p>
                         </div>
-                    @endforeach
+
+                        <!-- BADGE IMSAK & IFTAR -->
+                        <div
+                            class="bg-purple-950 text-white px-5 py-2 rounded-full text-xs font-medium tracking-wide shadow-sm flex items-center gap-2">
+                            <span>🌙 Imsak <strong class="text-purple-200">{{ $prayerData['imsak'] }}</strong></span>
+                            <span class="text-purple-400">|</span>
+                            <span>🌅 Iftar <strong class="text-purple-200">{{ $prayerData['maghrib'] }}</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- CARDS JADWAL SHOLAT (5 WAKTU) -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+                        @foreach ($prayerData['list'] as $key => $prayer)
+                            @php
+                                $isCurrent = $prayerData['current'] === $key;
+                                $isNext = $prayerData['next'] === $key;
+                            @endphp
+
+                            <div
+                                class="relative rounded-2xl p-4 md:p-5 transition-all duration-300 {{ $isCurrent ? 'bg-white border-2 border-emerald-500 shadow-xl scale-105 z-10' : 'bg-slate-100/80 hover:bg-emerald-50/50 border border-slate-200/60' }}">
+
+                                <!-- BADGE "NOW" -->
+                                @if ($isCurrent)
+                                    <span
+                                        class="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm">
+                                        Now
+                                    </span>
+                                @endif
+
+                                <div class="{{ $isCurrent ? 'mt-3' : '' }}">
+                                    <!-- NAMA SHOLAT & ICON -->
+                                    <div
+                                        class="flex items-center justify-between text-slate-600 font-bold text-xs md:text-sm mb-1">
+                                        <span>{{ $prayer['name'] }}</span>
+                                        <span class="text-sm">{{ $prayer['icon'] }}</span>
+                                    </div>
+
+                                    <!-- JAM SHOLAT -->
+                                    <div class="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
+                                        {{ $prayer['time'] }}
+                                    </div>
+
+                                    <!-- COUNTDOWN KE SHOLAT NEXT -->
+                                    @if ($isNext)
+                                        <p
+                                            class="text-[11px] text-emerald-600 font-semibold mt-2 pt-1.5 border-t border-slate-200/60">
+                                            ⏱️ {{ $prayerData['countdown'] }}
+                                        </p>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
-            </div>
+            @endif
         </div>
     </section>
 

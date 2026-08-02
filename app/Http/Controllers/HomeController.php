@@ -15,7 +15,7 @@ class HomeController extends Controller
     {
         $boardMembers = BoardMember::orderBy('order', 'asc')->get();
         $posts = Post::where('is_published', true)->latest()->take(3)->get();
-        
+
         // Ambil maksimal 4 agenda untuk cuplikan di Home (Rutin & Insidental)
         $events = Event::latest()->take(4)->get();
 
@@ -38,7 +38,27 @@ class HomeController extends Controller
             $prayerSchedule = null;
         }
 
-        return view('home', compact('boardMembers', 'posts', 'events', 'kasOperasional', 'kasPembangunan', 'kasYatim', 'totalSaldo', 'prayerSchedule'));
+        $prayerData = null;
+        try {
+            $response = Http::timeout(3)->get('https://api.myquran.com/v2/sholat/jadwal/0401/' . date('Y/m/d'));
+            if ($response->successful()) {
+                $schedule = $response->json()['data']['jadwal'] ?? null;
+                $prayerData = $this->processPrayerTimes($schedule);
+            }
+        } catch (\Exception $e) {
+            $prayerData = null;
+        }
+
+        return view('home', compact(
+            'boardMembers',
+            'posts',
+            'events',
+            'kasOperasional',
+            'kasPembangunan',
+            'kasYatim',
+            'totalSaldo',
+            'prayerData'
+        ));
     }
 
     // 2. Halaman Indeks Berita
@@ -94,5 +114,59 @@ class HomeController extends Controller
         $reports = FinancialReport::latest()->paginate(20);
 
         return view('keuangan', compact('kasOperasional', 'kasPembangunan', 'kasYatim', 'totalSaldo', 'reports'));
+    }
+
+    private function processPrayerTimes($schedule)
+    {
+        if (!$schedule) return null;
+
+        $now = now(); // Waktu saat ini
+        $today = $now->format('Y-m-d');
+
+        // Daftar sholat utama yang akan ditampilkan
+        $prayers = [
+            'subuh'   => ['name' => 'Subuh', 'icon' => '✨', 'time' => $schedule['subuh']],
+            'dzuhur'  => ['name' => 'Dzuhur', 'icon' => '☀️', 'time' => $schedule['dzuhur']],
+            'ashar'   => ['name' => 'Ashar', 'icon' => '⛅', 'time' => $schedule['ashar']],
+            'maghrib' => ['name' => 'Maghrib', 'icon' => '🌅', 'time' => $schedule['maghrib']],
+            'isya'    => ['name' => 'Isya', 'icon' => '🌙', 'time' => $schedule['isya']],
+        ];
+
+        $currentPrayer = 'isya'; // Default jika sudah lewat Isya (masuk waktu malam hingga Subuh)
+        $nextPrayerKey = 'subuh';
+        $nextPrayerTime = \Carbon\Carbon::parse($today . ' ' . $schedule['subuh'])->addDay(); // Subuh besok
+
+        // Loop untuk mengecek rentang waktu
+        $keys = array_keys($prayers);
+        for ($i = 0; $i < count($keys); $i++) {
+            $key = $keys[$i];
+            $timeCarbon = \Carbon\Carbon::parse($today . ' ' . $prayers[$key]['time']);
+
+            if ($now->greaterThanOrEqualTo($timeCarbon)) {
+                $currentPrayer = $key;
+
+                if ($i < count($keys) - 1) {
+                    $nextPrayerKey = $keys[$i + 1];
+                    $nextPrayerTime = \Carbon\Carbon::parse($today . ' ' . $prayers[$nextPrayerKey]['time']);
+                } else {
+                    // Jika sekarang Isya, jadwal berikutnya adalah Subuh besok
+                    $nextPrayerKey = 'subuh';
+                    $nextPrayerTime = \Carbon\Carbon::parse($today . ' ' . $schedule['subuh'])->addDay();
+                }
+            }
+        }
+
+        // Hitung sisa waktu ke sholat berikutnya
+        $diff = $now->diff($nextPrayerTime);
+        $countdownText = "in {$diff->h}h {$diff->i}m";
+
+        return [
+            'list' => $prayers,
+            'current' => $currentPrayer,
+            'next' => $nextPrayerKey,
+            'countdown' => $countdownText,
+            'imsak' => $schedule['imsak'] ?? '-',
+            'maghrib' => $schedule['maghrib'] ?? '-',
+        ];
     }
 }
