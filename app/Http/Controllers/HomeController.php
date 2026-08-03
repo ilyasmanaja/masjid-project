@@ -122,7 +122,7 @@ class HomeController extends Controller
         // Batas Subuh pakai Syuruq (jika ada dari API) atau +75 menit setelah azan Subuh
         $syuruq = isset($schedule['terbit'])
             ? \Carbon\Carbon::parse($today . ' ' . $schedule['terbit'], 'Asia/Jakarta')
-            : $subuh->copy()->addMinutes(30);
+            : $subuh->copy()->addMinutes(60);
 
         $dzuhur = \Carbon\Carbon::parse($today . ' ' . $schedule['dzuhur'], 'Asia/Jakarta');
         $ashar = \Carbon\Carbon::parse($today . ' ' . $schedule['ashar'], 'Asia/Jakarta');

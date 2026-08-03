@@ -80,7 +80,7 @@
                             @endphp
 
                             <div
-                                class="relative rounded-2xl p-4 md:p-5 transition-all duration-300 {{ $isHighlighted ? 'bg-white border-4 border-emerald-500 shadow-xl scale-105 z-10' : 'bg-slate-100/80 hover:bg-emerald-50/50 border border-slate-200/60' }}">
+                                class="relative rounded-2xl p-4 md:p-5 transition-all duration-300 {{ $isHighlighted ? 'bg-white border-4 border-emerald-500 shadow-xl scale-105 z-10' : 'bg-slate-100/80 hover:bg-emerald-50/50 border border-slate-200/60 text' }}">
 
                                 <!-- BADGE "NOW" ATAU "NEXT" -->
                                 @if ($isCurrent)
@@ -96,16 +96,21 @@
                                 @endif
 
                                 <div class="{{ $isHighlighted ? 'mt-3' : '' }}">
+                                    <!-- NAMA SHOLAT & ICON (LEBIH BESAR JIKA HIGHLIGHTED) -->
                                     <div
-                                        class="flex items-center justify-between text-slate-600 font-bold text-xs md:text-sm mb-1">
+                                        class="flex items-center justify-between font-bold mb-1 transition-all duration-300 {{ $isHighlighted ? 'text-slate-900 text-sm md:text-base' : 'text-slate-600 text-xs md:text-sm' }}">
                                         <span>{{ $prayer['name'] }}</span>
-                                        <span class="text-sm">{{ $prayer['icon'] }}</span>
+                                        <span
+                                            class="{{ $isHighlighted ? 'text-base md:text-lg' : 'text-sm' }}">{{ $prayer['icon'] }}</span>
                                     </div>
 
-                                    <div class="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
+                                    <!-- JAM SHOLAT (LEBIH BESAR JIKA HIGHLIGHTED) -->
+                                    <div
+                                        class="font-extrabold tracking-tight transition-all duration-300 {{ $isHighlighted ? 'text-2xl md:text-3xl text-emerald-700' : 'text-xl md:text-2xl text-slate-900' }}">
                                         {{ $prayer['time'] }}
                                     </div>
 
+                                    <!-- COUNTDOWN KE SHOLAT NEXT -->
                                     @if ($isNext)
                                         <p
                                             class="text-[11px] text-emerald-600 font-semibold mt-2 pt-1.5 border-t border-slate-200/60">
