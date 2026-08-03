@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Http;
 class HomeController extends Controller
 {
     // 1. Halaman Home
+    // 1. Halaman Home
     public function index()
     {
         $boardMembers = BoardMember::orderBy('order', 'asc')->get();
@@ -28,16 +29,7 @@ class HomeController extends Controller
 
         $totalSaldo = $kasOperasional + $kasPembangunan + $kasYatim;
 
-        $prayerSchedule = null;
-        try {
-            $response = Http::timeout(3)->get('https://api.myquran.com/v2/sholat/jadwal/0401/' . date('Y/m/d'));
-            if ($response->successful()) {
-                $prayerSchedule = $response->json()['data']['jadwal'] ?? null;
-            }
-        } catch (\Exception $e) {
-            $prayerSchedule = null;
-        }
-
+        // Ambil Jadwal Sholat (Cukup 1x Request API)
         $prayerData = null;
         try {
             $response = Http::timeout(3)->get('https://api.myquran.com/v2/sholat/jadwal/0401/' . date('Y/m/d'));
@@ -118,50 +110,75 @@ class HomeController extends Controller
 
     private function processPrayerTimes($schedule)
     {
-        if (!$schedule) return null;
+        if (!$schedule)
+            return null;
 
-        $now = now(); // Waktu saat ini
+        $now = \Carbon\Carbon::now('Asia/Jakarta');
         $today = $now->format('Y-m-d');
 
-        // Daftar sholat utama yang akan ditampilkan
-        $prayers = [
-            'subuh'   => ['name' => 'Subuh', 'icon' => '✨', 'time' => $schedule['subuh']],
-            'dzuhur'  => ['name' => 'Dzuhur', 'icon' => '☀️', 'time' => $schedule['dzuhur']],
-            'ashar'   => ['name' => 'Ashar', 'icon' => '⛅', 'time' => $schedule['ashar']],
-            'maghrib' => ['name' => 'Maghrib', 'icon' => '🌅', 'time' => $schedule['maghrib']],
-            'isya'    => ['name' => 'Isya', 'icon' => '🌙', 'time' => $schedule['isya']],
-        ];
+        // Instance waktu sholat hari ini
+        $subuh = \Carbon\Carbon::parse($today . ' ' . $schedule['subuh'], 'Asia/Jakarta');
 
-        $currentPrayer = 'isya'; // Default jika sudah lewat Isya (masuk waktu malam hingga Subuh)
-        $nextPrayerKey = 'subuh';
-        $nextPrayerTime = \Carbon\Carbon::parse($today . ' ' . $schedule['subuh'])->addDay(); // Subuh besok
+        // Batas Subuh pakai Syuruq (jika ada dari API) atau +75 menit setelah azan Subuh
+        $syuruq = isset($schedule['terbit'])
+            ? \Carbon\Carbon::parse($today . ' ' . $schedule['terbit'], 'Asia/Jakarta')
+            : $subuh->copy()->addMinutes(30);
 
-        // Loop untuk mengecek rentang waktu
-        $keys = array_keys($prayers);
-        for ($i = 0; $i < count($keys); $i++) {
-            $key = $keys[$i];
-            $timeCarbon = \Carbon\Carbon::parse($today . ' ' . $prayers[$key]['time']);
+        $dzuhur = \Carbon\Carbon::parse($today . ' ' . $schedule['dzuhur'], 'Asia/Jakarta');
+        $ashar = \Carbon\Carbon::parse($today . ' ' . $schedule['ashar'], 'Asia/Jakarta');
+        $maghrib = \Carbon\Carbon::parse($today . ' ' . $schedule['maghrib'], 'Asia/Jakarta');
+        $isya = \Carbon\Carbon::parse($today . ' ' . $schedule['isya'], 'Asia/Jakarta');
 
-            if ($now->greaterThanOrEqualTo($timeCarbon)) {
-                $currentPrayer = $key;
+        $currentPrayer = null; // Default null (bisa tidak ada yang NOW)
+        $nextPrayerKey = 'dzuhur';
+        $nextPrayerTime = $dzuhur;
 
-                if ($i < count($keys) - 1) {
-                    $nextPrayerKey = $keys[$i + 1];
-                    $nextPrayerTime = \Carbon\Carbon::parse($today . ' ' . $prayers[$nextPrayerKey]['time']);
-                } else {
-                    // Jika sekarang Isya, jadwal berikutnya adalah Subuh besok
-                    $nextPrayerKey = 'subuh';
-                    $nextPrayerTime = \Carbon\Carbon::parse($today . ' ' . $schedule['subuh'])->addDay();
-                }
-            }
+        // DETERMINASI WAKTU AKTIF & NEXT
+        if ($now->between($subuh, $syuruq)) {
+            // Masih dalam rentang waktu Subuh (Azan s/d Terbit Matahari)
+            $currentPrayer = 'subuh';
+            $nextPrayerKey = 'dzuhur';
+            $nextPrayerTime = $dzuhur;
+        } elseif ($now->between($syuruq, $dzuhur)) {
+            // Pagi hari setelah Syuruq s/d sebelum Dzuhur (Dhuha / Pagi)
+            $currentPrayer = null; // Tidak ada sholat wajib yang NOW
+            $nextPrayerKey = 'dzuhur';
+            $nextPrayerTime = $dzuhur;
+        } elseif ($now->between($dzuhur, $ashar)) {
+            $currentPrayer = 'dzuhur';
+            $nextPrayerKey = 'ashar';
+            $nextPrayerTime = $ashar;
+        } elseif ($now->between($ashar, $maghrib)) {
+            $currentPrayer = 'ashar';
+            $nextPrayerKey = 'maghrib';
+            $nextPrayerTime = $maghrib;
+        } elseif ($now->between($maghrib, $isya)) {
+            $currentPrayer = 'maghrib';
+            $nextPrayerKey = 'isya';
+            $nextPrayerTime = $isya;
+        } elseif ($now->greaterThanOrEqualTo($isya)) {
+            $currentPrayer = 'isya';
+            $nextPrayerKey = 'subuh';
+            $nextPrayerTime = $subuh->copy()->addDay();
+        } else {
+            // Dini hari sebelum Subuh (00:00 s/d 04:53)
+            $currentPrayer = 'isya';
+            $nextPrayerKey = 'subuh';
+            $nextPrayerTime = $subuh;
         }
 
-        // Hitung sisa waktu ke sholat berikutnya
+        // Hitung selisih waktu countdown
         $diff = $now->diff($nextPrayerTime);
-        $countdownText = "in {$diff->h}h {$diff->i}m";
+        $countdownText = ($diff->h > 0) ? "in {$diff->h}h {$diff->i}m" : "in {$diff->i}m";
 
         return [
-            'list' => $prayers,
+            'list' => [
+                'subuh' => ['name' => 'Subuh', 'icon' => '✨', 'time' => $schedule['subuh']],
+                'dzuhur' => ['name' => 'Dzuhur', 'icon' => '☀️', 'time' => $schedule['dzuhur']],
+                'ashar' => ['name' => 'Ashar', 'icon' => '⛅', 'time' => $schedule['ashar']],
+                'maghrib' => ['name' => 'Maghrib', 'icon' => '🌅', 'time' => $schedule['maghrib']],
+                'isya' => ['name' => 'Isya', 'icon' => '🌙', 'time' => $schedule['isya']],
+            ],
             'current' => $currentPrayer,
             'next' => $nextPrayerKey,
             'countdown' => $countdownText,

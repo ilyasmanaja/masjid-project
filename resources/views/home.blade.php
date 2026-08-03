@@ -74,33 +74,38 @@
                             @php
                                 $isCurrent = $prayerData['current'] === $key;
                                 $isNext = $prayerData['next'] === $key;
+
+                                // Highlight hijau diberikan ke 'NOW', atau ke 'NEXT' jika tidak ada sholat yang 'NOW'
+                                $isHighlighted = $isCurrent || (!$prayerData['current'] && $isNext);
                             @endphp
 
                             <div
-                                class="relative rounded-2xl p-4 md:p-5 transition-all duration-300 {{ $isCurrent ? 'bg-white border-2 border-emerald-500 shadow-xl scale-105 z-10' : 'bg-slate-100/80 hover:bg-emerald-50/50 border border-slate-200/60' }}">
+                                class="relative rounded-2xl p-4 md:p-5 transition-all duration-300 {{ $isHighlighted ? 'bg-white border-4 border-emerald-500 shadow-xl scale-105 z-10' : 'bg-slate-100/80 hover:bg-emerald-50/50 border border-slate-200/60' }}">
 
-                                <!-- BADGE "NOW" -->
+                                <!-- BADGE "NOW" ATAU "NEXT" -->
                                 @if ($isCurrent)
                                     <span
                                         class="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm">
                                         Now
                                     </span>
+                                @elseif(!$prayerData['current'] && $isNext)
+                                    <span
+                                        class="absolute top-2.5 left-2.5 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm">
+                                        Next
+                                    </span>
                                 @endif
 
-                                <div class="{{ $isCurrent ? 'mt-3' : '' }}">
-                                    <!-- NAMA SHOLAT & ICON -->
+                                <div class="{{ $isHighlighted ? 'mt-3' : '' }}">
                                     <div
                                         class="flex items-center justify-between text-slate-600 font-bold text-xs md:text-sm mb-1">
                                         <span>{{ $prayer['name'] }}</span>
                                         <span class="text-sm">{{ $prayer['icon'] }}</span>
                                     </div>
 
-                                    <!-- JAM SHOLAT -->
                                     <div class="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
                                         {{ $prayer['time'] }}
                                     </div>
 
-                                    <!-- COUNTDOWN KE SHOLAT NEXT -->
                                     @if ($isNext)
                                         <p
                                             class="text-[11px] text-emerald-600 font-semibold mt-2 pt-1.5 border-t border-slate-200/60">
